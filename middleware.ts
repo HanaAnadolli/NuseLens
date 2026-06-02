@@ -1,13 +1,15 @@
 // middleware.ts
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+import { updateSession } from "@/utils/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
+  const supabaseResponse = await updateSession(request);
   const { pathname } = request.nextUrl;
   const protectedPath = pathname === "/admin" || pathname.startsWith("/admin/") || pathname === "/settings" || pathname.startsWith("/settings/");
 
   if (!protectedPath) {
-    return NextResponse.next();
+    return supabaseResponse;
   }
 
   const token = request.cookies.get("session")?.value;
@@ -29,7 +31,7 @@ export async function middleware(request: NextRequest) {
       return redirectToLogin(request);
     }
 
-    return NextResponse.next();
+    return supabaseResponse;
   } catch {
     return redirectToLogin(request);
   }
