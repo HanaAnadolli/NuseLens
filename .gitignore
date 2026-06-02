@@ -1,0 +1,13 @@
+# .gitignore
+node_modules
+.next
+out
+dist
+.env
+.env*.local
+coverage
+*.log
+*.tsbuildinfo
+.DS_Store
+public/uploads/*
+!public/uploads/.gitkeep

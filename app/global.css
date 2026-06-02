@@ -1,0 +1,68 @@
+/* app/global.css */
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #111111;
+  --color-primary-foreground: #ffffff;
+
+  --color-lavender: #d8cfdd;
+  --color-lavender-foreground: #2f2933;
+
+  --color-pink: #f5dfe8;
+  --color-pink-foreground: #3a2a31;
+
+  --color-cream: #f3eee5;
+  --color-cream-foreground: #332f29;
+
+  --color-sage: #a8b9a3;
+  --color-sage-foreground: #1f2a1f;
+
+  --color-background: #fffaf8;
+  --color-surface: #ffffff;
+  --color-surface-soft: #f8f3f0;
+
+  --color-foreground: #171717;
+  --color-muted-foreground: #756f6a;
+
+  --color-border: #eadfd8;
+
+  --color-danger: #dc2626;
+  --color-danger-foreground: #ffffff;
+
+  --color-success: #3f7f4a;
+  --color-success-foreground: #ffffff;
+
+  --color-warning: #c77b2d;
+  --color-warning-foreground: #ffffff;
+
+  --radius-card: 1.25rem;
+  --radius-button: 999px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--color-background);
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}

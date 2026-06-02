@@ -1,0 +1,22 @@
+# docker-compose.yml
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nuselens-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nuselens
+      POSTGRES_USER: nuselens
+      POSTGRES_PASSWORD: nuselens_password
+    ports:
+      - "55432:5432"
+    volumes:
+      - nuselens-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nuselens -d nuselens"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  nuselens-postgres-data:
