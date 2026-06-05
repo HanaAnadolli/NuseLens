@@ -42,7 +42,7 @@ export default function UploadPage() {
               Ngarkoni fotot që keni bërë dhe na ndihmoni t&apos;i mbledhim kujtimet në një vend të vetëm.
             </p>
             <p className="font-serif text-sm italic text-muted-foreground animate-fade-up [animation-delay:380ms]">
-              Deri në {maxFilesPerUpload} foto, çdo foto deri në {maxUploadSizeMb}MB.
+              Deri në {maxFilesPerUpload} foto.
             </p>
           </div>
 
