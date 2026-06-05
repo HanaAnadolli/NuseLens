@@ -2,8 +2,8 @@
 import crypto from "crypto";
 import { mkdir, unlink, writeFile } from "fs/promises";
 import path from "path";
+import { Buffer } from "buffer";
 import type { Photo } from "@prisma/client";
-import { getPrisma } from "@core/db";
 import { error, formatError } from "@core/logger";
 import type { PhotoDto, PhotoValidationResult, SavedUpload } from "@/features/photos/types";
 
@@ -17,6 +17,18 @@ const ALLOWED_IMAGE_TYPES = new Map<string, string>([
 
 const DEFAULT_MAX_UPLOAD_SIZE_MB = 8;
 const DEFAULT_MAX_FILES_PER_UPLOAD = 10;
+const SUPABASE_STORAGE = "supabase";
+const DEFAULT_SUPABASE_STORAGE_BUCKET = "photos";
+const GOOGLE_DRIVE_STORAGE = "google_drive";
+const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const GOOGLE_DRIVE_API_URL = "https://www.googleapis.com/drive/v3";
+const GOOGLE_DRIVE_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3";
+const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+
+let cachedGoogleAccessToken: {
+  accessToken: string;
+  expiresAt: number;
+} | null = null;
 
 export function getMaxUploadSizeBytes(): number {
   try {
@@ -71,7 +83,7 @@ export function photoToDto(photo: Photo): PhotoDto {
 
 export async function getPhotos(): Promise<PhotoDto[]> {
   try {
-    const prisma = getPrisma();
+    const prisma = await getPhotoPrisma();
     const photos = await prisma.photo.findMany({
       orderBy: { createdAt: "desc" },
     });
@@ -96,7 +108,7 @@ export async function createPhotoRecord(input: {
   mimeType: string;
 }): Promise<PhotoDto> {
   try {
-    const prisma = getPrisma();
+    const prisma = await getPhotoPrisma();
     const photo = await prisma.photo.create({
       data: {
         guestName: input.guestName?.trim() || null,
@@ -121,7 +133,7 @@ export async function createPhotoRecord(input: {
 
 export async function deletePhoto(id: string): Promise<boolean> {
   try {
-    const prisma = getPrisma();
+    const prisma = await getPhotoPrisma();
     const photo = await prisma.photo.findUnique({ where: { id } });
 
     if (!photo) {
@@ -129,7 +141,7 @@ export async function deletePhoto(id: string): Promise<boolean> {
     }
 
     await prisma.photo.delete({ where: { id } });
-    await deleteUploadedFile(photo.fileUrl);
+    await deleteUploadedFile(photo.fileUrl, photo.fileName);
     return true;
   } catch (e) {
     error("Fotoja nuk u fshi dot. Ju lutemi provoni përsëri më vonë.", {
@@ -151,32 +163,15 @@ export async function saveUploadedFile(file: File): Promise<SavedUpload> {
       throw new Error(validation.message ?? "Ju lutemi ngarkoni një foto të vlefshme.");
     }
 
-    const uploadDir = resolveUploadDir();
-    await mkdir(uploadDir, { recursive: true });
-
-    const extension = ALLOWED_IMAGE_TYPES.get(file.type);
-    if (!extension) {
-      throw new Error("Ju lutemi ngarkoni një foto të vlefshme.");
+    if (getPhotoStorageDriver() === GOOGLE_DRIVE_STORAGE) {
+      return saveUploadedFileToGoogleDrive(file);
     }
 
-    const generatedName = `${crypto.randomUUID()}.${extension}`;
-    const destination = path.join(uploadDir, generatedName);
-    const resolvedDestination = path.resolve(destination);
-
-    if (!resolvedDestination.startsWith(uploadDir + path.sep)) {
-      throw new Error("Ju lutemi ngarkoni një foto të vlefshme.");
+    if (getPhotoStorageDriver() === SUPABASE_STORAGE) {
+      return saveUploadedFileToSupabase(file);
     }
 
-    const bytes = Buffer.from(await file.arrayBuffer());
-    await writeFile(resolvedDestination, bytes);
-
-    return {
-      fileUrl: `/uploads/${generatedName}`,
-      fileName: generatedName,
-      originalName: sanitizeOriginalName(file.name),
-      fileSize: file.size,
-      mimeType: file.type,
-    };
+    return saveUploadedFileToDisk(file);
   } catch (e) {
     error("Skedari i ngarkuar nuk u ruajt dot. Ju lutemi provoni përsëri më vonë.", {
       file: "features/photos/service.ts",
@@ -252,6 +247,113 @@ function resolveUploadDir(): string {
   }
 }
 
+function getPhotoStorageDriver(): string {
+  return process.env.PHOTO_STORAGE?.trim() || "local";
+}
+
+async function getPhotoPrisma() {
+  const { getPrisma } = await import("@core/db");
+  return getPrisma();
+}
+
+async function saveUploadedFileToDisk(file: File): Promise<SavedUpload> {
+  const uploadDir = resolveUploadDir();
+  await mkdir(uploadDir, { recursive: true });
+
+  const extension = ALLOWED_IMAGE_TYPES.get(file.type);
+  if (!extension) {
+    throw new Error("Ju lutemi ngarkoni një foto të vlefshme.");
+  }
+
+  const generatedName = `${crypto.randomUUID()}.${extension}`;
+  const destination = path.join(uploadDir, generatedName);
+  const resolvedDestination = path.resolve(destination);
+
+  if (!resolvedDestination.startsWith(uploadDir + path.sep)) {
+    throw new Error("Ju lutemi ngarkoni një foto të vlefshme.");
+  }
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+  await writeFile(resolvedDestination, bytes);
+
+  return {
+    fileUrl: `/uploads/${generatedName}`,
+    fileName: generatedName,
+    originalName: sanitizeOriginalName(file.name),
+    fileSize: file.size,
+    mimeType: file.type,
+  };
+}
+
+async function saveUploadedFileToGoogleDrive(file: File): Promise<SavedUpload> {
+  const folderId = getRequiredEnv("GOOGLE_DRIVE_FOLDER_ID");
+  const extension = ALLOWED_IMAGE_TYPES.get(file.type);
+
+  if (!extension) {
+    throw new Error("Ju lutemi ngarkoni një foto të vlefshme.");
+  }
+
+  const originalName = sanitizeOriginalName(file.name);
+  const generatedName = `${crypto.randomUUID()}-${originalName || `uploaded-photo.${extension}`}`;
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const accessToken = await getGoogleAccessToken();
+  const createdFile = await createGoogleDriveFile({
+    accessToken,
+    folderId,
+    fileName: generatedName,
+    mimeType: file.type,
+    bytes,
+  });
+
+  if (shouldMakeGoogleDriveFilesPublic()) {
+    await makeGoogleDriveFilePublic(accessToken, createdFile.id);
+  }
+
+  return {
+    fileUrl: getGoogleDriveImageUrl(createdFile.id),
+    fileName: createdFile.id,
+    originalName,
+    fileSize: file.size,
+    mimeType: file.type,
+  };
+}
+
+async function saveUploadedFileToSupabase(file: File): Promise<SavedUpload> {
+  const bucket = getSupabaseStorageBucket();
+  const extension = ALLOWED_IMAGE_TYPES.get(file.type);
+
+  if (!extension) {
+    throw new Error("Ju lutemi ngarkoni një foto të vlefshme.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const originalName = sanitizeOriginalName(file.name);
+  const objectPath = `${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}-${originalName || `uploaded-photo.${extension}`}`;
+  const bytes = Buffer.from(await file.arrayBuffer());
+
+  const response = await fetch(`${supabase.url}/storage/v1/object/${encodeURIComponent(bucket)}/${encodeSupabaseStoragePath(objectPath)}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${supabase.serviceRoleKey}`,
+      "Content-Type": file.type,
+      "Cache-Control": "31536000",
+    },
+    body: bytes,
+  });
+
+  if (!response.ok) {
+    throw new Error(await getSupabaseErrorMessage(response, "Supabase Storage upload failed."));
+  }
+
+  return {
+    fileUrl: getSupabaseStoragePublicUrl(bucket, objectPath),
+    fileName: objectPath,
+    originalName,
+    fileSize: file.size,
+    mimeType: file.type,
+  };
+}
+
 function sanitizeOriginalName(originalName: string): string {
   try {
     const baseName = path.basename(originalName);
@@ -266,15 +368,33 @@ function sanitizeOriginalName(originalName: string): string {
   }
 }
 
-async function deleteUploadedFile(fileUrl: string): Promise<void> {
+async function deleteUploadedFile(fileUrl: string, fileName?: string): Promise<void> {
   try {
+    if (getPhotoStorageDriver() === SUPABASE_STORAGE || isSupabaseStorageUrl(fileUrl)) {
+      const objectPath = fileName || getSupabaseStorageObjectPath(fileUrl);
+
+      if (objectPath) {
+        await deleteSupabaseStorageFile(objectPath);
+        return;
+      }
+    }
+
+    if (isGoogleDriveUrl(fileUrl)) {
+      const driveFileId = getGoogleDriveFileId(fileUrl) ?? (fileName && !fileName.includes("/") ? fileName : null);
+
+      if (driveFileId) {
+        await deleteGoogleDriveFile(driveFileId);
+        return;
+      }
+    }
+
     if (!fileUrl.startsWith("/uploads/")) {
       return;
     }
 
     const uploadDir = resolveUploadDir();
-    const fileName = path.basename(fileUrl);
-    const target = path.resolve(uploadDir, fileName);
+    const localFileName = path.basename(fileUrl);
+    const target = path.resolve(uploadDir, localFileName);
 
     if (!target.startsWith(uploadDir + path.sep)) {
       return;
@@ -293,4 +413,254 @@ async function deleteUploadedFile(fileUrl: string): Promise<void> {
       error: formatError(e),
     });
   }
+}
+
+function getSupabaseStorageBucket(): string {
+  return process.env.SUPABASE_STORAGE_BUCKET?.trim() || DEFAULT_SUPABASE_STORAGE_BUCKET;
+}
+
+function getSupabaseAdminClient() {
+  return {
+    url: getRequiredEnv("NEXT_PUBLIC_SUPABASE_URL").replace(/\/$/, ""),
+    serviceRoleKey: getRequiredEnv("SUPABASE_SERVICE_ROLE_KEY"),
+  };
+}
+
+async function deleteSupabaseStorageFile(objectPath: string): Promise<void> {
+  const supabase = getSupabaseAdminClient();
+  const response = await fetch(`${supabase.url}/storage/v1/object/${encodeURIComponent(getSupabaseStorageBucket())}/${encodeSupabaseStoragePath(objectPath)}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${supabase.serviceRoleKey}`,
+    },
+  });
+
+  if (!response.ok && response.status !== 404) {
+    throw new Error(await getSupabaseErrorMessage(response, "Supabase Storage file could not be deleted."));
+  }
+}
+
+async function getGoogleAccessToken(): Promise<string> {
+  if (cachedGoogleAccessToken && cachedGoogleAccessToken.expiresAt > Date.now() + 60_000) {
+    return cachedGoogleAccessToken.accessToken;
+  }
+
+  const serviceAccountEmail = getRequiredEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL");
+  const privateKey = getGooglePrivateKey();
+  const now = Math.floor(Date.now() / 1000);
+  const assertion = signJwt(
+    { alg: "RS256", typ: "JWT" },
+    {
+      iss: serviceAccountEmail,
+      scope: GOOGLE_DRIVE_SCOPE,
+      aud: GOOGLE_TOKEN_URL,
+      exp: now + 3600,
+      iat: now,
+    },
+    privateKey
+  );
+
+  const response = await fetch(GOOGLE_TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion,
+    }),
+  });
+
+  const data = (await response.json().catch(() => null)) as { access_token?: string; expires_in?: number; error_description?: string } | null;
+
+  if (!response.ok || !data?.access_token) {
+    throw new Error(data?.error_description || "Google Drive authorization failed.");
+  }
+
+  cachedGoogleAccessToken = {
+    accessToken: data.access_token,
+    expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000,
+  };
+
+  return data.access_token;
+}
+
+async function createGoogleDriveFile(input: {
+  accessToken: string;
+  folderId: string;
+  fileName: string;
+  mimeType: string;
+  bytes: Buffer<ArrayBuffer>;
+}): Promise<{ id: string }> {
+  const createResponse = await fetch(`${GOOGLE_DRIVE_UPLOAD_URL}/files?uploadType=resumable&supportsAllDrives=true&fields=id`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.accessToken}`,
+      "Content-Type": "application/json; charset=UTF-8",
+      "X-Upload-Content-Type": input.mimeType,
+      "X-Upload-Content-Length": String(input.bytes.byteLength),
+    },
+    body: JSON.stringify({
+      name: input.fileName,
+      parents: [input.folderId],
+    }),
+  });
+
+  if (!createResponse.ok) {
+    throw new Error(await getGoogleErrorMessage(createResponse, "Google Drive upload could not start."));
+  }
+
+  const uploadUrl = createResponse.headers.get("location");
+  if (!uploadUrl) {
+    throw new Error("Google Drive upload URL was not returned.");
+  }
+
+  const uploadResponse = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": input.mimeType,
+      "Content-Length": String(input.bytes.byteLength),
+    },
+    body: input.bytes,
+  });
+
+  const uploadedFile = (await uploadResponse.json().catch(() => null)) as { id?: string } | null;
+
+  if (!uploadResponse.ok || !uploadedFile?.id) {
+    throw new Error(await getGoogleErrorMessage(uploadResponse, "Google Drive upload failed."));
+  }
+
+  return { id: uploadedFile.id };
+}
+
+async function makeGoogleDriveFilePublic(accessToken: string, fileId: string): Promise<void> {
+  const response = await fetch(`${GOOGLE_DRIVE_API_URL}/files/${encodeURIComponent(fileId)}/permissions?supportsAllDrives=true`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      role: "reader",
+      type: "anyone",
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await getGoogleErrorMessage(response, "Google Drive file permission could not be created."));
+  }
+}
+
+async function deleteGoogleDriveFile(fileId: string): Promise<void> {
+  const accessToken = await getGoogleAccessToken();
+  const response = await fetch(`${GOOGLE_DRIVE_API_URL}/files/${encodeURIComponent(fileId)}?supportsAllDrives=true`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok && response.status !== 404) {
+    throw new Error(await getGoogleErrorMessage(response, "Google Drive file could not be deleted."));
+  }
+}
+
+function signJwt(header: Record<string, unknown>, payload: Record<string, unknown>, privateKey: string): string {
+  const encodedHeader = base64UrlEncode(JSON.stringify(header));
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const input = `${encodedHeader}.${encodedPayload}`;
+  const signer = crypto.createSign("RSA-SHA256");
+  signer.update(input);
+  signer.end();
+  return `${input}.${signer.sign(privateKey, "base64url")}`;
+}
+
+function base64UrlEncode(value: string): string {
+  return Buffer.from(value).toString("base64url");
+}
+
+function getGooglePrivateKey(): string {
+  const base64Key = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY_BASE64?.trim();
+
+  if (base64Key) {
+    return Buffer.from(base64Key, "base64").toString("utf8");
+  }
+
+  return getRequiredEnv("GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY").replace(/\\n/g, "\n");
+}
+
+function getRequiredEnv(name: string): string {
+  const value = process.env[name]?.trim();
+
+  if (!value) {
+    throw new Error(`${name} is required.`);
+  }
+
+  return value;
+}
+
+function shouldMakeGoogleDriveFilesPublic(): boolean {
+  return process.env.GOOGLE_DRIVE_MAKE_PUBLIC !== "false";
+}
+
+function getGoogleDriveImageUrl(fileId: string): string {
+  return `https://drive.google.com/uc?export=view&id=${encodeURIComponent(fileId)}`;
+}
+
+function isGoogleDriveUrl(fileUrl: string): boolean {
+  return fileUrl.startsWith("https://drive.google.com/");
+}
+
+function getSupabaseStoragePublicUrl(bucket: string, objectPath: string): string {
+  const supabaseUrl = getRequiredEnv("NEXT_PUBLIC_SUPABASE_URL").replace(/\/$/, "");
+  return `${supabaseUrl}/storage/v1/object/public/${encodeURIComponent(bucket)}/${encodeSupabaseStoragePath(objectPath)}`;
+}
+
+function encodeSupabaseStoragePath(objectPath: string): string {
+  return objectPath
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+}
+
+function isSupabaseStorageUrl(fileUrl: string): boolean {
+  try {
+    const supabaseUrl = getRequiredEnv("NEXT_PUBLIC_SUPABASE_URL");
+    return fileUrl.startsWith(`${supabaseUrl}/storage/v1/object/public/${getSupabaseStorageBucket()}/`);
+  } catch {
+    return false;
+  }
+}
+
+function getGoogleDriveFileId(fileUrl: string): string | null {
+  try {
+    const url = new URL(fileUrl);
+    return url.searchParams.get("id");
+  } catch {
+    return null;
+  }
+}
+
+function getSupabaseStorageObjectPath(fileUrl: string): string | null {
+  try {
+    const url = new URL(fileUrl);
+    const marker = `/storage/v1/object/public/${getSupabaseStorageBucket()}/`;
+    const markerIndex = url.pathname.indexOf(marker);
+
+    if (markerIndex === -1) {
+      return null;
+    }
+
+    return decodeURIComponent(url.pathname.slice(markerIndex + marker.length));
+  } catch {
+    return null;
+  }
+}
+
+async function getGoogleErrorMessage(response: Response, fallback: string): Promise<string> {
+  const data = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+  return data?.error?.message || fallback;
+}
+
+async function getSupabaseErrorMessage(response: Response, fallback: string): Promise<string> {
+  const data = (await response.json().catch(() => null)) as { message?: string; error?: string } | null;
+  return data?.message || data?.error || fallback;
 }

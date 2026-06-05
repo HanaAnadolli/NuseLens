@@ -10,7 +10,6 @@ import {
   setSessionCookie,
   verifyPassword,
 } from "@core/auth";
-import { getPrisma } from "@core/db";
 import { error, formatError } from "@core/logger";
 import type { AuthResult, AuthUser } from "@/features/auth/types";
 
@@ -36,7 +35,7 @@ type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
 export async function loginUser(input: LoginInput): Promise<AuthResult> {
   try {
-    const prisma = getPrisma();
+    const prisma = await getAuthPrisma();
     const user = await prisma.user.findUnique({
       where: { email: input.email.toLowerCase() },
     });
@@ -75,7 +74,7 @@ export async function loginUser(input: LoginInput): Promise<AuthResult> {
 
 export async function registerUser(input: RegisterInput): Promise<AuthResult | { conflictMessage: string }> {
   try {
-    const prisma = getPrisma();
+    const prisma = await getAuthPrisma();
     const existingUser = await prisma.user.findUnique({
       where: { email: input.email.toLowerCase() },
     });
@@ -139,7 +138,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     const session = await getSession();
     if (!session) return null;
 
-    const prisma = getPrisma();
+    const prisma = await getAuthPrisma();
     const user = await prisma.user.findUnique({
       where: { id: session.sub },
     });
@@ -160,7 +159,7 @@ export async function requireUserFromRequest(request: NextRequest): Promise<Auth
     const session = await getSessionFromRequest(request);
     if (!session) return null;
 
-    const prisma = getPrisma();
+    const prisma = await getAuthPrisma();
     const user = await prisma.user.findUnique({
       where: { id: session.sub },
     });
@@ -192,7 +191,7 @@ export async function requireAdminFromRequest(request: NextRequest): Promise<Aut
 
 export async function changePassword(userId: string, input: ChangePasswordInput): Promise<void> {
   try {
-    const prisma = getPrisma();
+    const prisma = await getAuthPrisma();
     const user = await prisma.user.findUnique({ where: { id: userId } });
 
     if (!user) {
@@ -224,6 +223,11 @@ export async function changePassword(userId: string, input: ChangePasswordInput)
 
     throw new Error("Fjalëkalimi nuk u ndryshua dot. Ju lutemi provoni përsëri.");
   }
+}
+
+async function getAuthPrisma() {
+  const { getPrisma } = await import("@core/db");
+  return getPrisma();
 }
 
 function toAuthUser(user: {

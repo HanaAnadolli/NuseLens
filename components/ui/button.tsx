@@ -5,12 +5,12 @@ import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex h-11 items-center justify-center gap-2 rounded-button px-5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex h-11 items-center justify-center gap-2 rounded-button px-5 text-sm font-medium transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-foreground",
-        secondary: "border border-border bg-surface text-foreground hover:bg-surface-soft",
+        default: "border border-primary bg-surface text-primary hover:bg-primary hover:text-primary-foreground hover:shadow-md",
+        secondary: "border border-border bg-transparent text-foreground hover:bg-surface-soft hover:shadow-sm",
         ghost: "bg-transparent text-foreground hover:bg-surface-soft",
         danger: "bg-danger text-danger-foreground hover:bg-danger/90",
         success: "bg-success text-success-foreground hover:bg-success/90",

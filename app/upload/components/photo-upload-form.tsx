@@ -162,13 +162,14 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
             <Label htmlFor="photos">Fotot</Label>
             <label
               htmlFor="photos"
-              className="flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-card border border-dashed border-border bg-cream px-4 py-8 text-center transition-colors hover:bg-surface-soft"
+              className="group flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-card border border-dashed border-border bg-surface-soft px-4 py-10 text-center transition-all duration-300 hover:border-primary/50 hover:bg-cream"
             >
-              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-surface">
-                <ImagePlus className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
-              </span>
-              <span className="mt-4 text-base font-medium text-foreground">Zgjidhni fotot</span>
-              <span className="mt-1 text-xs text-muted-foreground">
+              <ImagePlus
+                className="h-10 w-10 text-muted-foreground transition-transform duration-300 group-hover:scale-110 group-hover:text-primary"
+                aria-hidden="true"
+              />
+              <span className="mt-4 font-serif text-xl text-foreground">Zgjidhni fotot</span>
+              <span className="mt-1 font-serif text-sm italic text-muted-foreground">
                 Deri në {maxFilesPerUpload} foto, {maxUploadSizeMb}MB secila
               </span>
             </label>
