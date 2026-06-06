@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight, Upload } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
+import { Reveal } from "@/components/reveal";
 
 const steps = [
   {
@@ -108,24 +109,22 @@ export default function HomePage() {
 
       <section id="how-it-works" className="relative px-4 py-16 sm:px-6 sm:py-20">
         <div className="mx-auto max-w-5xl">
-          <div className="mb-10 space-y-2 text-center sm:mb-14">
+          <Reveal className="mb-10 space-y-2 text-center sm:mb-14">
             <p className="font-serif text-xs uppercase tracking-[0.32em] text-muted-foreground">Si funksionon</p>
             <h2 className="font-serif text-3xl font-semibold text-foreground sm:text-4xl">
               Tri hapa të vegjël
             </h2>
-          </div>
+          </Reveal>
 
           <div className="grid gap-5 sm:gap-6 md:grid-cols-3">
             {steps.map((step, index) => (
-              <article
-                key={step.title}
-                style={{ animationDelay: `${index * 140}ms` }}
-                className="group relative rounded-card border border-border bg-surface px-6 py-7 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:shadow-md sm:px-7 sm:py-8 animate-fade-up"
-              >
-                <p className="font-script text-4xl text-primary">{step.number}</p>
-                <h3 className="mt-3 font-serif text-2xl font-semibold text-foreground">{step.title}</h3>
-                <p className="mt-3 leading-7 text-muted-foreground">{step.description}</p>
-              </article>
+              <Reveal key={step.title} delay={index * 140}>
+                <article className="group relative h-full rounded-card border border-border bg-surface px-6 py-7 shadow-sm transition-all duration-500 hover:-translate-y-1 hover:shadow-md sm:px-7 sm:py-8">
+                  <p className="font-script text-4xl text-primary">{step.number}</p>
+                  <h3 className="mt-3 font-serif text-2xl font-semibold text-foreground">{step.title}</h3>
+                  <p className="mt-3 leading-7 text-muted-foreground">{step.description}</p>
+                </article>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -140,7 +139,7 @@ export default function HomePage() {
           aria-hidden="true"
           className="pointer-events-none absolute -right-8 -top-6 w-36 rotate-12 opacity-70 sm:-right-10 sm:-top-8 sm:w-64 sm:opacity-80"
         />
-        <div className="relative mx-auto max-w-3xl text-center">
+        <Reveal className="relative mx-auto max-w-3xl text-center">
           <p className="font-serif text-xs uppercase tracking-[0.32em] text-muted-foreground">
             Një kërkesë e vogël
           </p>
@@ -151,11 +150,11 @@ export default function HomePage() {
             Ato spontane, ato të lumtura, detajet e vogla dhe kujtimet që mund të na shpëtojnë gjatë mbrëmjes —
             çdo foto ka shumë vlerë për ne.
           </p>
-        </div>
+        </Reveal>
       </section>
 
       <section className="px-4 py-20 sm:px-6 sm:py-24">
-        <div className="mx-auto max-w-3xl text-center">
+        <Reveal className="mx-auto max-w-3xl text-center">
           <div className="mx-auto mb-6 w-40 opacity-90 sm:mb-8 sm:w-48">
             <Image
               src="/home/flower3.png"
@@ -179,7 +178,7 @@ export default function HomePage() {
               </Link>
             </Button>
           </div>
-        </div>
+        </Reveal>
       </section>
 
       <footer className="border-t border-border bg-surface/70 px-4 py-8 sm:px-6">
