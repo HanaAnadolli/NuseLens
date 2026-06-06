@@ -236,7 +236,10 @@ export async function createSupabaseUploadSession(input: {
       throw new Error("Sesioni i ngarkimit nuk u krijua dot.");
     }
 
-    const signedUrl = data.url.startsWith("http") ? data.url : `${supabase.url}${data.url.startsWith("/") ? "" : "/"}${data.url}`;
+    const relativePath = data.url.startsWith("/") ? data.url : `/${data.url}`;
+    const signedUrl = data.url.startsWith("http")
+      ? data.url
+      : `${supabase.url}/storage/v1${relativePath}`;
 
     return {
       signedUrl,
