@@ -4,29 +4,23 @@
 import type { AuthUser } from "@/features/auth/types";
 
 interface AuthResponse {
-  data?: {
-    user: AuthUser;
-  };
+  user?: AuthUser;
   error?: string;
 }
 
 export async function submitLogin(input: { email: string; password: string }): Promise<AuthUser> {
-  try {
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    const body = (await response.json()) as AuthResponse;
+  const response = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const body = (await response.json().catch(() => ({}))) as AuthResponse;
 
-    if (!response.ok || !body.data?.user) {
-      throw new Error(body.error ?? "Hyrja nuk u krye dot.");
-    }
-
-    return body.data.user;
-  } catch {
-    throw new Error("Hyrja nuk u krye dot. Ju lutemi kontrolloni të dhënat dhe provoni përsëri.");
+  if (!response.ok || !body.user) {
+    throw new Error(body.error ?? "Hyrja nuk u krye dot. Ju lutemi kontrolloni të dhënat dhe provoni përsëri.");
   }
+
+  return body.user;
 }
 
 export async function submitRegister(input: {
@@ -34,22 +28,18 @@ export async function submitRegister(input: {
   email: string;
   password: string;
 }): Promise<AuthUser> {
-  try {
-    const response = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    });
-    const body = (await response.json()) as AuthResponse;
+  const response = await fetch("/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const body = (await response.json().catch(() => ({}))) as AuthResponse;
 
-    if (!response.ok || !body.data?.user) {
-      throw new Error(body.error ?? "Llogaria nuk u krijua dot.");
-    }
-
-    return body.data.user;
-  } catch {
-    throw new Error("Llogaria nuk u krijua dot. Ju lutemi provoni përsëri.");
+  if (!response.ok || !body.user) {
+    throw new Error(body.error ?? "Llogaria nuk u krijua dot. Ju lutemi provoni përsëri.");
   }
+
+  return body.user;
 }
 
 export async function submitLogout(): Promise<void> {
