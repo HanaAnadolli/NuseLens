@@ -8,6 +8,7 @@ import {
 } from "@/features/photos/service";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export const POST = withErrorHandler(async (request) => {
   const formData = await request.formData();
@@ -32,16 +33,12 @@ export const POST = withErrorHandler(async (request) => {
     }
   }
 
-  const photos = [];
-
-  for (const file of files) {
-    const savedFile = await saveUploadedFile(file);
-    const photo = await createPhotoRecord({
-      guestName,
-      ...savedFile,
-    });
-    photos.push(photo);
-  }
+  const photos = await Promise.all(
+    files.map(async (file) => {
+      const savedFile = await saveUploadedFile(file);
+      return createPhotoRecord({ guestName, ...savedFile });
+    })
+  );
 
   return success({ photos }, 201);
 });

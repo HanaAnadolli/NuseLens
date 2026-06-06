@@ -4,11 +4,24 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
+const SESSION_KEY = "splash-shown";
+const VISIBLE_MS = 1600;
+
 export function LoadingScreen() {
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setHidden(true), 2400);
+    try {
+      if (sessionStorage.getItem(SESSION_KEY)) {
+        setHidden(true);
+        return;
+      }
+      sessionStorage.setItem(SESSION_KEY, "1");
+    } catch {
+      // private mode / disabled storage — just show the splash this once.
+    }
+
+    const t = setTimeout(() => setHidden(true), VISIBLE_MS);
     return () => clearTimeout(t);
   }, []);
 

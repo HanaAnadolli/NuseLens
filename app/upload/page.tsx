@@ -1,4 +1,6 @@
 // app/upload/page.tsx
+export const dynamic = "force-static";
+
 import Image from "next/image";
 import { AppShell } from "@/components/app-shell";
 import { getMaxFilesPerUpload } from "@/features/photos/service";
