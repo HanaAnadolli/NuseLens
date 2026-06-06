@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/features/auth/service";
 import { getPhotos } from "@/features/photos/service";
 import { LogoutButton } from "@/components/logout-button";
-import { PhotoGrid } from "./components/photo-grid";
+import { FolderGrid } from "./components/folder-grid";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +71,7 @@ export default async function AdminPage() {
             </div>
           </div>
         </div>
-        <PhotoGrid initialPhotos={photos} />
+        <FolderGrid initialPhotos={photos} />
       </section>
     </AppShell>
   );

@@ -81,6 +81,26 @@ export function photoToDto(photo: Photo): PhotoDto {
   }
 }
 
+export async function getPhotosByGuest(guestName: string | null): Promise<PhotoDto[]> {
+  try {
+    const prisma = await getPhotoPrisma();
+    const photos = await prisma.photo.findMany({
+      where: guestName === null ? { guestName: null } : { guestName },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return photos.map(photoToDto);
+  } catch (e) {
+    error("Fotot e mysafirit nuk u ngarkuan dot.", {
+      file: "features/photos/service.ts",
+      function: "getPhotosByGuest",
+      guestName: guestName ?? "(anonymous)",
+      error: formatError(e),
+    });
+    throw new Error("Fotot e mysafirit nuk u ngarkuan dot. Ju lutemi provoni përsëri më vonë.");
+  }
+}
+
 export async function getPhotos(): Promise<PhotoDto[]> {
   try {
     const prisma = await getPhotoPrisma();
