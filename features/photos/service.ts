@@ -187,6 +187,97 @@ export async function saveUploadedFile(file: File): Promise<SavedUpload> {
   }
 }
 
+export interface UploadSession {
+  signedUrl: string;
+  path: string;
+  publicUrl: string;
+  originalName: string;
+  fileSize: number;
+  mimeType: string;
+}
+
+export async function createSupabaseUploadSession(input: {
+  name: string;
+  mimeType: string;
+  fileSize: number;
+}): Promise<UploadSession> {
+  try {
+    const validation = validateFileMetadata({ mimeType: input.mimeType, fileSize: input.fileSize });
+    if (!validation.valid) {
+      throw new Error(validation.message ?? "Ju lutemi ngarkoni një foto të vlefshme.");
+    }
+
+    const extension = ALLOWED_IMAGE_TYPES.get(input.mimeType);
+    if (!extension) {
+      throw new Error("Ju lutemi ngarkoni një foto të vlefshme.");
+    }
+
+    const bucket = getSupabaseStorageBucket();
+    const supabase = getSupabaseAdminClient();
+    const originalName = sanitizeOriginalName(input.name);
+    const objectPath = `${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}-${originalName || `uploaded-photo.${extension}`}`;
+
+    const signEndpoint = `${supabase.url}/storage/v1/object/upload/sign/${encodeURIComponent(bucket)}/${encodeSupabaseStoragePath(objectPath)}`;
+    const response = await fetch(signEndpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${supabase.serviceRoleKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!response.ok) {
+      throw new Error(await getSupabaseErrorMessage(response, "Sesioni i ngarkimit nuk u krijua dot."));
+    }
+
+    const data = (await response.json().catch(() => null)) as { url?: string; token?: string } | null;
+    if (!data?.url) {
+      throw new Error("Sesioni i ngarkimit nuk u krijua dot.");
+    }
+
+    const signedUrl = data.url.startsWith("http") ? data.url : `${supabase.url}${data.url.startsWith("/") ? "" : "/"}${data.url}`;
+
+    return {
+      signedUrl,
+      path: objectPath,
+      publicUrl: getSupabaseStoragePublicUrl(bucket, objectPath),
+      originalName,
+      fileSize: input.fileSize,
+      mimeType: input.mimeType,
+    };
+  } catch (e) {
+    error("Couldn't create Supabase upload session", {
+      file: "features/photos/service.ts",
+      function: "createSupabaseUploadSession",
+      error: formatError(e),
+    });
+    throw e instanceof Error ? e : new Error("Sesioni i ngarkimit nuk u krijua dot.");
+  }
+}
+
+export function validateFileMetadata(file: { mimeType: string; fileSize: number }): PhotoValidationResult {
+  if (!ALLOWED_IMAGE_TYPES.has(file.mimeType)) {
+    return {
+      valid: false,
+      message: "Ju lutemi ngarkoni vetëm foto JPEG, PNG, WebP, HEIC ose HEIF.",
+    };
+  }
+
+  if (file.fileSize <= 0) {
+    return { valid: false, message: "Një nga skedarët e zgjedhur është bosh." };
+  }
+
+  if (file.fileSize > getMaxUploadSizeBytes()) {
+    return {
+      valid: false,
+      message: `Çdo foto duhet të jetë ${process.env.MAX_UPLOAD_SIZE_MB ?? DEFAULT_MAX_UPLOAD_SIZE_MB}MB ose më e vogël.`,
+    };
+  }
+
+  return { valid: true };
+}
+
 export function validateImageFile(file: File): PhotoValidationResult {
   try {
     if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
