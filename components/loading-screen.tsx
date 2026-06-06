@@ -21,14 +21,14 @@ export function LoadingScreen() {
       aria-hidden="true"
       className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center bg-background animate-splash-out"
     >
-      <div className="flex flex-col items-center gap-6 px-6 text-center">
+      <div className="flex flex-col items-center gap-10 px-6 text-center sm:gap-12">
         <Image
           src="/home/flower2.png"
           alt=""
-          width={220}
-          height={220}
+          width={480}
+          height={480}
           priority
-          className="h-40 w-40 sm:h-52 sm:w-52 animate-bloom"
+          className="w-64 sm:w-80 md:w-96 animate-bloom"
         />
         <h1 className="font-script text-5xl text-foreground sm:text-6xl animate-script-in">
           Kanagjegji Blerinës
