@@ -71,7 +71,7 @@ export default function HomePage() {
               <span className="font-script text-[1.15em] font-normal text-primary">
                 kanagjegjin
               </span>{" "}
-              e Blerinës
+              e Blerines
             </h1>
             <p className="max-w-xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8 animate-fade-up [animation-delay:260ms]">
               Na ndihmoni të mbledhim momentet e veçanta të kësaj mbrëmjeje — fotot tuaja do të bëhen pjesë e
@@ -185,7 +185,7 @@ export default function HomePage() {
       <footer className="border-t border-border bg-surface/70 px-4 py-8 sm:px-6">
         <div className="mx-auto max-w-7xl text-center">
           <p className="font-script text-xl text-muted-foreground">
-            Me dashuri për ditën e veçantë të Blerinës
+            Me dashuri për ditën e veçantë të Blerines
           </p>
         </div>
       </footer>

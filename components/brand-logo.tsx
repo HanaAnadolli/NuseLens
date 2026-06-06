@@ -15,7 +15,7 @@ export function BrandLogo({ className }: BrandLogoProps) {
         className
       )}
     >
-      Kanagjegji Blerinës
+      Kanagjegji Blerines
     </Link>
   );
 }

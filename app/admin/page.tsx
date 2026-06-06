@@ -50,7 +50,7 @@ export default async function AdminPage() {
                 Galeria e fotove
               </h1>
               <p className="mt-3 max-w-xl text-sm leading-7 text-muted-foreground">
-                Shikoni fotot që mysafirët kanë ndarë nga festa e Blerinës.
+                Shikoni fotot që mysafirët kanë ndarë nga festa e Blerines.
               </p>
             </div>
             <div className="flex items-center gap-3 rounded-card border border-border bg-cream px-4 py-3">

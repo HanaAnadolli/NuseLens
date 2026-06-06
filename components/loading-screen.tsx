@@ -31,7 +31,7 @@ export function LoadingScreen() {
           className="w-64 sm:w-80 md:w-96 animate-bloom"
         />
         <h1 className="font-script text-5xl text-foreground sm:text-6xl animate-script-in">
-          Kanagjegji Blerinës
+          Kanagjegji Blerines
         </h1>
         <p className="font-serif text-sm uppercase tracking-[0.4em] text-muted-foreground animate-fade-in [animation-delay:600ms]">
           6 qershor 2026

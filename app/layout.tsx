@@ -6,7 +6,7 @@ import { Providers } from "./providers";
 import "./global.css";
 
 export const metadata: Metadata = {
-  title: "Kanagjegji Blerinës",
+  title: "Kanagjegji Blerines",
   description: "Ngarkim i thjeshtë fotosh për mysafirët dhe administratorët e eventit.",
 };
 
