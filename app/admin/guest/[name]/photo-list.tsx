@@ -47,10 +47,30 @@ export function PhotoList({ initialPhotos }: PhotoListProps) {
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const blob = await response.blob();
+      const fallbackName = photo.mimeType.startsWith("video/") ? "video.mp4" : "foto.jpg";
+      const filename = photo.originalName || fallbackName;
+      const file = new File([blob], filename, { type: photo.mimeType });
+
+      const shareNavigator = navigator as Navigator & {
+        canShare?: (data: ShareData) => boolean;
+        share?: (data: ShareData) => Promise<void>;
+      };
+
+      if (shareNavigator.canShare?.({ files: [file] }) && typeof shareNavigator.share === "function") {
+        try {
+          await shareNavigator.share({ files: [file] });
+          return;
+        } catch (shareError) {
+          if (shareError instanceof Error && shareError.name === "AbortError") {
+            return;
+          }
+        }
+      }
+
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = objectUrl;
-      link.download = photo.originalName || "media";
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
