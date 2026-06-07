@@ -1,7 +1,7 @@
 // app/admin/guest/[name]/photo-list.tsx
 "use client";
 
-import { Download, Loader2, Trash2 } from "lucide-react";
+import { Download, Loader2, Play, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { deletePhotoById } from "@/features/photos/hooks";
 import type { PhotoDto } from "@/features/photos/types";
@@ -9,6 +9,10 @@ import { PhotoLightbox } from "./photo-lightbox";
 
 interface PhotoListProps {
   initialPhotos: PhotoDto[];
+}
+
+function isVideo(photo: PhotoDto): boolean {
+  return photo.mimeType.startsWith("video/");
 }
 
 export function PhotoList({ initialPhotos }: PhotoListProps) {
@@ -19,7 +23,7 @@ export function PhotoList({ initialPhotos }: PhotoListProps) {
   const [error, setError] = useState("");
 
   async function handleDelete(id: string): Promise<void> {
-    if (!window.confirm("Ta fshijmë këtë foto?")) return;
+    if (!window.confirm("Ta fshijmë këtë skedar?")) return;
 
     setError("");
     setDeletingId(id);
@@ -28,7 +32,7 @@ export function PhotoList({ initialPhotos }: PhotoListProps) {
       await deletePhotoById(id);
       setPhotos((current) => current.filter((photo) => photo.id !== id));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Fotoja nuk u fshi dot. Ju lutemi provoni përsëri.");
+      setError(e instanceof Error ? e.message : "Skedari nuk u fshi dot. Ju lutemi provoni përsëri.");
     } finally {
       setDeletingId(null);
     }
@@ -46,7 +50,7 @@ export function PhotoList({ initialPhotos }: PhotoListProps) {
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = objectUrl;
-      link.download = photo.originalName || "foto.jpg";
+      link.download = photo.originalName || "media";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -61,9 +65,9 @@ export function PhotoList({ initialPhotos }: PhotoListProps) {
   if (photos.length === 0) {
     return (
       <div className="rounded-card border border-border bg-cream px-6 py-16 text-center">
-        <p className="font-serif text-2xl font-semibold text-foreground">Asnjë foto.</p>
+        <p className="font-serif text-2xl font-semibold text-foreground">Asnjë skedar.</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Ky mysafir nuk ka më foto në galeri.
+          Ky mysafir nuk ka më skedarë në galeri.
         </p>
       </div>
     );
@@ -80,6 +84,7 @@ export function PhotoList({ initialPhotos }: PhotoListProps) {
         {photos.map((photo, idx) => {
           const isDownloading = downloadingId === photo.id;
           const isDeleting = deletingId === photo.id;
+          const video = isVideo(photo);
 
           return (
             <div
@@ -92,12 +97,29 @@ export function PhotoList({ initialPhotos }: PhotoListProps) {
                 className="block h-full w-full"
                 aria-label={`Hape ${photo.originalName}`}
               >
-                <img
-                  src={photo.fileUrl}
-                  alt={photo.originalName}
-                  loading="lazy"
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover/tile:scale-105"
-                />
+                {video ? (
+                  <>
+                    <video
+                      src={photo.fileUrl}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover/tile:scale-105"
+                    />
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/15">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface/90 shadow-md backdrop-blur-sm">
+                        <Play className="h-5 w-5 text-primary" aria-hidden="true" />
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <img
+                    src={photo.fileUrl}
+                    alt={photo.originalName}
+                    loading="lazy"
+                    className="h-full w-full object-cover transition-transform duration-500 group-hover/tile:scale-105"
+                  />
+                )}
               </button>
               <div className="absolute right-2 top-2 z-10 flex gap-1.5">
                 <button

@@ -15,7 +15,15 @@ const ALLOWED_IMAGE_TYPES = new Map<string, string>([
   ["image/heif", "heif"],
 ]);
 
+const ALLOWED_VIDEO_TYPES = new Map<string, string>([
+  ["video/mp4", "mp4"],
+  ["video/quicktime", "mov"],
+  ["video/webm", "webm"],
+]);
+
 const DEFAULT_MAX_UPLOAD_SIZE_MB = 8;
+const DEFAULT_MAX_VIDEO_SIZE_MB = 200;
+export const MAX_VIDEO_DURATION_SECONDS = 300;
 const DEFAULT_MAX_FILES_PER_UPLOAD = 10;
 const SUPABASE_STORAGE = "supabase";
 const DEFAULT_SUPABASE_STORAGE_BUCKET = "photos";
@@ -43,6 +51,20 @@ export function getMaxUploadSizeBytes(): number {
     });
     return DEFAULT_MAX_UPLOAD_SIZE_MB * 1024 * 1024;
   }
+}
+
+export function getMaxVideoSizeBytes(): number {
+  const parsed = Number(process.env.MAX_VIDEO_SIZE_MB ?? DEFAULT_MAX_VIDEO_SIZE_MB);
+  const maxMb = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_MAX_VIDEO_SIZE_MB;
+  return maxMb * 1024 * 1024;
+}
+
+export function isVideoMimeType(mimeType: string): boolean {
+  return ALLOWED_VIDEO_TYPES.has(mimeType);
+}
+
+export function isImageMimeType(mimeType: string): boolean {
+  return ALLOWED_IMAGE_TYPES.has(mimeType);
 }
 
 export function getMaxFilesPerUpload(): number {
@@ -227,15 +249,16 @@ export async function createSupabaseUploadSession(input: {
       throw new Error(validation.message ?? "Ju lutemi ngarkoni një foto të vlefshme.");
     }
 
-    const extension = ALLOWED_IMAGE_TYPES.get(input.mimeType);
+    const extension = ALLOWED_IMAGE_TYPES.get(input.mimeType) ?? ALLOWED_VIDEO_TYPES.get(input.mimeType);
     if (!extension) {
-      throw new Error("Ju lutemi ngarkoni një foto të vlefshme.");
+      throw new Error("Ju lutemi ngarkoni një skedar të vlefshëm.");
     }
 
     const bucket = getSupabaseStorageBucket();
     const supabase = getSupabaseAdminClient();
     const originalName = sanitizeOriginalName(input.name);
-    const objectPath = `${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}-${originalName || `uploaded-photo.${extension}`}`;
+    const fallbackName = `uploaded-media.${extension}`;
+    const objectPath = `${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}-${originalName || fallbackName}`;
 
     const signEndpoint = `${supabase.url}/storage/v1/object/upload/sign/${encodeURIComponent(bucket)}/${encodeSupabaseStoragePath(objectPath)}`;
     const response = await fetch(signEndpoint, {
@@ -280,10 +303,13 @@ export async function createSupabaseUploadSession(input: {
 }
 
 export function validateFileMetadata(file: { mimeType: string; fileSize: number }): PhotoValidationResult {
-  if (!ALLOWED_IMAGE_TYPES.has(file.mimeType)) {
+  const isImage = ALLOWED_IMAGE_TYPES.has(file.mimeType);
+  const isVideo = ALLOWED_VIDEO_TYPES.has(file.mimeType);
+
+  if (!isImage && !isVideo) {
     return {
       valid: false,
-      message: "Ju lutemi ngarkoni vetëm foto JPEG, PNG, WebP, HEIC ose HEIF.",
+      message: "Ju lutemi ngarkoni vetëm foto (JPEG, PNG, WebP, HEIC, HEIF) ose video (MP4, MOV, WebM).",
     };
   }
 
@@ -291,7 +317,15 @@ export function validateFileMetadata(file: { mimeType: string; fileSize: number 
     return { valid: false, message: "Një nga skedarët e zgjedhur është bosh." };
   }
 
-  if (file.fileSize > getMaxUploadSizeBytes()) {
+  if (isVideo) {
+    if (file.fileSize > getMaxVideoSizeBytes()) {
+      const maxMb = process.env.MAX_VIDEO_SIZE_MB ?? DEFAULT_MAX_VIDEO_SIZE_MB;
+      return {
+        valid: false,
+        message: `Çdo video duhet të jetë ${maxMb}MB ose më e vogël.`,
+      };
+    }
+  } else if (file.fileSize > getMaxUploadSizeBytes()) {
     return {
       valid: false,
       message: `Çdo foto duhet të jetë ${process.env.MAX_UPLOAD_SIZE_MB ?? DEFAULT_MAX_UPLOAD_SIZE_MB}MB ose më e vogël.`,

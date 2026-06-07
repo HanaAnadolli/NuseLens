@@ -27,6 +27,10 @@ interface PhotoLightboxProps {
 
 const AUTOPLAY_MS = 4000;
 
+function isVideo(photo: PhotoDto): boolean {
+  return photo.mimeType.startsWith("video/");
+}
+
 export function PhotoLightbox({
   photos,
   startIndex,
@@ -80,13 +84,16 @@ export function PhotoLightbox({
     };
   }, []);
 
+  const photo = photos[index];
+  const photoIsVideo = photo ? isVideo(photo) : false;
+
   useEffect(() => {
     if (!playing || photos.length <= 1) return;
+    if (photoIsVideo) return;
     const timer = setInterval(goNext, AUTOPLAY_MS);
     return () => clearInterval(timer);
-  }, [playing, photos.length, goNext]);
+  }, [playing, photos.length, goNext, photoIsVideo]);
 
-  const photo = photos[index];
   if (!photo) return null;
 
   const isDownloading = downloadingId === photo.id;
@@ -114,7 +121,8 @@ export function PhotoLightbox({
             <button
               type="button"
               onClick={() => setPlaying((p) => !p)}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-button bg-surface/15 text-surface backdrop-blur-sm transition-colors duration-200 hover:bg-surface/30"
+              disabled={photoIsVideo}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-button bg-surface/15 text-surface backdrop-blur-sm transition-colors duration-200 hover:bg-surface/30 disabled:opacity-30"
               aria-label={playing ? "Ndalo slide-show-in" : "Nis slide-show-in"}
             >
               {playing ? (
@@ -148,80 +156,114 @@ export function PhotoLightbox({
         </div>
       </div>
 
-      <TransformWrapper
-        key={photo.id}
-        initialScale={1}
-        minScale={1}
-        maxScale={6}
-        centerOnInit
-        doubleClick={{ mode: "toggle", step: 1.8 }}
-        wheel={{ step: 0.2 }}
-      >
-        {({ zoomIn, zoomOut, resetTransform }) => (
-          <>
-            <TransformComponent
-              wrapperClass="!w-screen !h-screen"
-              contentClass="!w-screen !h-screen !flex !items-center !justify-center"
-            >
-              <img
-                src={photo.fileUrl}
-                alt={photo.originalName}
-                draggable={false}
-                className="max-h-[80vh] max-w-[92vw] select-none object-contain"
-              />
-            </TransformComponent>
-
-            <div className="absolute inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 px-4 py-5 sm:px-6">
-              <button
-                type="button"
-                onClick={goPrev}
-                disabled={photos.length <= 1}
-                className="inline-flex h-12 w-12 items-center justify-center rounded-button bg-surface/15 text-surface backdrop-blur-sm transition-colors duration-200 hover:bg-surface/30 disabled:opacity-30"
-                aria-label="Foto e mëparshme"
+      {photoIsVideo ? (
+        <div className="relative z-10 flex h-screen w-screen items-center justify-center px-4">
+          <video
+            key={photo.id}
+            src={photo.fileUrl}
+            controls
+            autoPlay
+            playsInline
+            className="max-h-[80vh] max-w-[92vw] rounded-2xl bg-foreground"
+          />
+        </div>
+      ) : (
+        <TransformWrapper
+          key={photo.id}
+          initialScale={1}
+          minScale={1}
+          maxScale={6}
+          centerOnInit
+          doubleClick={{ mode: "toggle", step: 1.8 }}
+          wheel={{ step: 0.2 }}
+        >
+          {({ zoomIn, zoomOut, resetTransform }) => (
+            <>
+              <TransformComponent
+                wrapperClass="!w-screen !h-screen"
+                contentClass="!w-screen !h-screen !flex !items-center !justify-center"
               >
-                <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-              </button>
+                <img
+                  src={photo.fileUrl}
+                  alt={photo.originalName}
+                  draggable={false}
+                  className="max-h-[80vh] max-w-[92vw] select-none object-contain"
+                />
+              </TransformComponent>
 
-              <div className="flex items-center gap-1 rounded-button bg-surface/15 p-1 backdrop-blur-sm">
+              <div className="absolute inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 px-4 py-5 sm:px-6">
                 <button
                   type="button"
-                  onClick={() => zoomOut()}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-button text-surface transition-colors duration-200 hover:bg-surface/20"
-                  aria-label="Zvogëlo"
+                  onClick={goPrev}
+                  disabled={photos.length <= 1}
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-button bg-surface/15 text-surface backdrop-blur-sm transition-colors duration-200 hover:bg-surface/30 disabled:opacity-30"
+                  aria-label="Foto e mëparshme"
                 >
-                  <ZoomOut className="h-4 w-4" aria-hidden="true" />
+                  <ChevronLeft className="h-5 w-5" aria-hidden="true" />
                 </button>
+
+                <div className="flex items-center gap-1 rounded-button bg-surface/15 p-1 backdrop-blur-sm">
+                  <button
+                    type="button"
+                    onClick={() => zoomOut()}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-button text-surface transition-colors duration-200 hover:bg-surface/20"
+                    aria-label="Zvogëlo"
+                  >
+                    <ZoomOut className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => resetTransform()}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-button text-surface transition-colors duration-200 hover:bg-surface/20"
+                    aria-label="Përshtate"
+                  >
+                    <Maximize className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => zoomIn()}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-button text-surface transition-colors duration-200 hover:bg-surface/20"
+                    aria-label="Zmadho"
+                  >
+                    <ZoomIn className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => resetTransform()}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-button text-surface transition-colors duration-200 hover:bg-surface/20"
-                  aria-label="Përshtate"
+                  onClick={goNext}
+                  disabled={photos.length <= 1}
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-button bg-surface/15 text-surface backdrop-blur-sm transition-colors duration-200 hover:bg-surface/30 disabled:opacity-30"
+                  aria-label="Foto tjetër"
                 >
-                  <Maximize className="h-4 w-4" aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => zoomIn()}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-button text-surface transition-colors duration-200 hover:bg-surface/20"
-                  aria-label="Zmadho"
-                >
-                  <ZoomIn className="h-4 w-4" aria-hidden="true" />
+                  <ChevronRight className="h-5 w-5" aria-hidden="true" />
                 </button>
               </div>
+            </>
+          )}
+        </TransformWrapper>
+      )}
 
-              <button
-                type="button"
-                onClick={goNext}
-                disabled={photos.length <= 1}
-                className="inline-flex h-12 w-12 items-center justify-center rounded-button bg-surface/15 text-surface backdrop-blur-sm transition-colors duration-200 hover:bg-surface/30 disabled:opacity-30"
-                aria-label="Foto tjetër"
-              >
-                <ChevronRight className="h-5 w-5" aria-hidden="true" />
-              </button>
-            </div>
-          </>
-        )}
-      </TransformWrapper>
+      {photoIsVideo && photos.length > 1 ? (
+        <div className="absolute inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 px-4 py-5 sm:px-6">
+          <button
+            type="button"
+            onClick={goPrev}
+            className="inline-flex h-12 w-12 items-center justify-center rounded-button bg-surface/15 text-surface backdrop-blur-sm transition-colors duration-200 hover:bg-surface/30"
+            aria-label="Skedari i mëparshëm"
+          >
+            <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={goNext}
+            className="inline-flex h-12 w-12 items-center justify-center rounded-button bg-surface/15 text-surface backdrop-blur-sm transition-colors duration-200 hover:bg-surface/30"
+            aria-label="Skedari tjetër"
+          >
+            <ChevronRight className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

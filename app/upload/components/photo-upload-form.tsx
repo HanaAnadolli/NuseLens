@@ -1,7 +1,7 @@
 // app/upload/components/photo-upload-form.tsx
 "use client";
 
-import { Camera, Check, ImagePlus, Loader2, Plus, Upload, X } from "lucide-react";
+import { Camera, Check, ImagePlus, Loader2, Play, Plus, Upload, X } from "lucide-react";
 import {
   type ChangeEvent,
   type DragEvent,
@@ -26,6 +26,7 @@ interface PreviewFile {
   id: string;
   file: File;
   url: string;
+  isVideo: boolean;
 }
 
 interface UploadSession {
@@ -46,11 +47,42 @@ interface RecordedPhoto {
 }
 
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
+const ACCEPTED_TYPES = [...ACCEPTED_IMAGE_TYPES, ...ACCEPTED_VIDEO_TYPES];
+const MAX_VIDEO_SIZE_MB = 200;
+const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
+const MAX_VIDEO_DURATION_SECONDS = 300;
+
+function isVideoType(type: string): boolean {
+  return ACCEPTED_VIDEO_TYPES.includes(type);
+}
+
+function getVideoDuration(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.muted = true;
+    const objectUrl = URL.createObjectURL(file);
+
+    video.onloadedmetadata = () => {
+      const duration = video.duration;
+      URL.revokeObjectURL(objectUrl);
+      resolve(duration);
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Couldn't read video metadata"));
+    };
+
+    video.src = objectUrl;
+  });
+}
 
 export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUploadFormProps) {
   const [guestName, setGuestName] = useState("");
   const [files, setFiles] = useState<PreviewFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const [progressMap, setProgressMap] = useState<Record<string, number>>({});
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -81,7 +113,7 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
     setFiles((currentFiles) => [...currentFiles, ...nextFiles]);
   }
 
-  function processFiles(incoming: File[], mode: "replace" | "append"): void {
+  async function processFiles(incoming: File[], mode: "replace" | "append"): Promise<void> {
     setError("");
     setSuccess(false);
 
@@ -93,37 +125,64 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
     const existingCount = mode === "append" ? files.length : 0;
 
     if (existingCount + incoming.length > maxFilesPerUpload) {
-      setError(`Ju lutemi zgjidhni jo më shumë se ${maxFilesPerUpload} foto.`);
+      setError(`Ju lutemi zgjidhni jo më shumë se ${maxFilesPerUpload} skedarë.`);
       return;
     }
 
-    const invalidType = incoming.find((file) => !ACCEPTED_IMAGE_TYPES.includes(file.type));
+    const invalidType = incoming.find((file) => !ACCEPTED_TYPES.includes(file.type));
     if (invalidType) {
-      setError("Ju lutemi ngarkoni vetëm foto JPEG, PNG, WebP, HEIC ose HEIF.");
+      setError("Ju lutemi ngarkoni vetëm foto (JPEG, PNG, WebP, HEIC, HEIF) ose video (MP4, MOV, WebM).");
       return;
     }
 
-    const oversized = incoming.find((file) => file.size > maxUploadSizeBytes);
-    if (oversized) {
-      setError(`Çdo foto duhet të jetë ${maxUploadSizeMb}MB ose më e vogël.`);
-      return;
+    for (const file of incoming) {
+      if (isVideoType(file.type)) {
+        if (file.size > MAX_VIDEO_SIZE_BYTES) {
+          setError(`Çdo video duhet të jetë ${MAX_VIDEO_SIZE_MB}MB ose më e vogël.`);
+          return;
+        }
+      } else if (file.size > maxUploadSizeBytes) {
+        setError(`Çdo foto duhet të jetë ${maxUploadSizeMb}MB ose më e vogël.`);
+        return;
+      }
     }
 
-    const previews = incoming.map((file) => ({
-      id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
-      file,
-      url: URL.createObjectURL(file),
-    }));
+    setIsProcessing(true);
 
-    if (mode === "append") {
-      appendFiles(previews);
-    } else {
-      replaceFiles(previews);
+    try {
+      for (const file of incoming) {
+        if (!isVideoType(file.type)) continue;
+        try {
+          const duration = await getVideoDuration(file);
+          if (duration > MAX_VIDEO_DURATION_SECONDS + 1) {
+            setError(`Çdo video duhet të jetë ${Math.round(MAX_VIDEO_DURATION_SECONDS / 60)} minuta ose më e shkurtër.`);
+            return;
+          }
+        } catch {
+          setError("Një nga videot nuk u verifikua dot. Provoni një tjetër.");
+          return;
+        }
+      }
+
+      const previews = incoming.map((file) => ({
+        id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
+        file,
+        url: URL.createObjectURL(file),
+        isVideo: isVideoType(file.type),
+      }));
+
+      if (mode === "append") {
+        appendFiles(previews);
+      } else {
+        replaceFiles(previews);
+      }
+    } finally {
+      setIsProcessing(false);
     }
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>): void {
-    processFiles(Array.from(event.target.files ?? []), files.length > 0 ? "append" : "replace");
+    void processFiles(Array.from(event.target.files ?? []), files.length > 0 ? "append" : "replace");
     event.target.value = "";
   }
 
@@ -159,7 +218,7 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
 
     const dropped = Array.from(event.dataTransfer.files ?? []);
     if (dropped.length > 0) {
-      processFiles(dropped, files.length > 0 ? "append" : "replace");
+      void processFiles(dropped, files.length > 0 ? "append" : "replace");
     }
   }
 
@@ -199,7 +258,7 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
           resolve();
           return;
         }
-        reject(new Error(`Ngarkimi i fotos dështoi (${xhr.status}).`));
+        reject(new Error(`Ngarkimi i skedarit dështoi (${xhr.status}).`));
       };
       xhr.onerror = () => reject(new Error("Lidhja u ndërpre gjatë ngarkimit."));
       xhr.send(preview.file);
@@ -220,7 +279,7 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
     setSuccess(false);
 
     if (files.length === 0) {
-      setError("Ju lutemi zgjidhni të paktën një foto.");
+      setError("Ju lutemi zgjidhni të paktën një skedar.");
       return;
     }
 
@@ -238,14 +297,14 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
 
       if (!recordResponse.ok) {
         const errorBody = (await recordResponse.json().catch(() => ({}))) as { error?: string };
-        throw new Error(errorBody.error ?? "Regjistrimi i fotove dështoi.");
+        throw new Error(errorBody.error ?? "Regjistrimi i skedarëve dështoi.");
       }
 
       replaceFiles([]);
       setGuestName("");
       setSuccess(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Fotot nuk u ngarkuan dot. Ju lutemi provoni përsëri.");
+      setError(e instanceof Error ? e.message : "Ngarkimi dështoi. Ju lutemi provoni përsëri.");
     } finally {
       setIsUploading(false);
     }
@@ -266,7 +325,7 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
   }
 
   const canAddMore = files.length < maxFilesPerUpload;
-  const submitLabel = files.length > 0 ? `Ngarko ${files.length} foto` : "Ngarko fotot";
+  const submitLabel = files.length > 0 ? `Ngarko ${files.length}` : "Ngarko";
   const totalProgress = files.length
     ? Math.round(files.reduce((sum, f) => sum + (progressMap[f.id] ?? 0), 0) / files.length)
     : 0;
@@ -303,7 +362,7 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <Label htmlFor="photos">Fotot</Label>
+              <Label htmlFor="photos">Fotot dhe videot</Label>
               {files.length > 0 ? (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-cream px-3 py-1 text-xs font-medium text-foreground">
                   <Camera className="h-3 w-3" aria-hidden="true" />
@@ -336,10 +395,10 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
                   />
                 </div>
                 <span className="mt-5 font-serif text-2xl text-foreground">
-                  {isDragActive ? "Lëshojini këtu" : "Zgjidhni fotot"}
+                  {isDragActive ? "Lëshojini këtu" : "Zgjidhni fotot ose videot"}
                 </span>
                 <span className="mt-1 font-serif text-sm italic text-muted-foreground">
-                  Ose tërhiqini këtu nga galeria
+                  Video deri në 5 minuta · Tërhiqini këtu nga galeria
                 </span>
               </label>
             ) : (
@@ -351,11 +410,28 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
                       key={preview.id}
                       className="group/tile relative aspect-square overflow-hidden rounded-2xl border border-border bg-cream shadow-sm transition-shadow duration-300 hover:shadow-md animate-fade-up"
                     >
-                      <img
-                        src={preview.url}
-                        alt={preview.file.name}
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover/tile:scale-105"
-                      />
+                      {preview.isVideo ? (
+                        <>
+                          <video
+                            src={preview.url}
+                            muted
+                            playsInline
+                            preload="metadata"
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover/tile:scale-105"
+                          />
+                          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/15">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-surface/90 shadow-md backdrop-blur-sm">
+                              <Play className="h-5 w-5 text-primary" aria-hidden="true" />
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <img
+                          src={preview.url}
+                          alt={preview.file.name}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover/tile:scale-105"
+                        />
+                      )}
                       {isUploading ? (
                         <div className="absolute inset-0 flex items-end bg-foreground/30 backdrop-blur-[1px]">
                           <div className="h-1 w-full bg-surface/40">
@@ -408,12 +484,19 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
               id="photos"
               name="photos"
               type="file"
-              accept={ACCEPTED_IMAGE_TYPES.join(",")}
+              accept={ACCEPTED_TYPES.join(",")}
               multiple
               className="sr-only"
               onChange={handleFileChange}
-              disabled={isUploading}
+              disabled={isUploading || isProcessing}
             />
+
+            {isProcessing ? (
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                Po kontrollohen skedarët...
+              </p>
+            ) : null}
           </div>
 
           {error ? (
@@ -432,7 +515,7 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
               </div>
               <div className="space-y-0.5">
                 <p className="font-medium">Faleminderit!</p>
-                <p className="leading-6">Fotot tuaja janë në galeri tani. Ngarkoni edhe më shumë nëse dëshironi.</p>
+                <p className="leading-6">Skedarët tuaj janë në galeri tani. Ngarkoni edhe më shumë nëse dëshironi.</p>
               </div>
             </div>
           ) : null}
@@ -440,7 +523,7 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
           <Button
             type="submit"
             className="h-14 w-full text-base"
-            disabled={isUploading || files.length === 0}
+            disabled={isUploading || isProcessing || files.length === 0}
           >
             {isUploading ? (
               <>
