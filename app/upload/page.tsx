@@ -44,7 +44,7 @@ export default function UploadPage() {
               Ngarkoni fotot që keni bërë dhe na ndihmoni t&apos;i mbledhim kujtimet në një vend të vetëm.
             </p>
             <p className="font-serif text-sm italic text-muted-foreground animate-fade-up [animation-delay:380ms]">
-              Deri në {maxFilesPerUpload} skedarë · Video deri në 5 minuta.
+              Video deri në 5 minuta. Foto e video pa kufi numri.
             </p>
           </div>
 

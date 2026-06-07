@@ -1,6 +1,6 @@
 // app/api/photos/record/route.ts
 import { badRequest, success, withErrorHandler } from "@core/api";
-import { createPhotoRecord, getMaxFilesPerUpload } from "@/features/photos/service";
+import { createPhotoRecord } from "@/features/photos/service";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -39,11 +39,6 @@ export const POST = withErrorHandler(async (request) => {
 
   if (!Array.isArray(body.photos) || body.photos.length === 0) {
     return badRequest("Asnjë foto nuk u rregjistrua.");
-  }
-
-  const maxFiles = getMaxFilesPerUpload();
-  if (body.photos.length > maxFiles) {
-    return badRequest(`Ju lutemi ngarkoni jo më shumë se ${maxFiles} foto njëherësh.`);
   }
 
   const validPhotos = (body.photos as PhotoMetadataInput[]).filter(isValidPhoto);

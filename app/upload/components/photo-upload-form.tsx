@@ -57,6 +57,25 @@ function isVideoType(type: string): boolean {
   return ACCEPTED_VIDEO_TYPES.includes(type);
 }
 
+async function runWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function pull(): Promise<void> {
+    while (true) {
+      const current = next++;
+      if (current >= items.length) return;
+      results[current] = await worker(items[current]!, current);
+    }
+  }
+  const lanes = Math.min(concurrency, items.length);
+  await Promise.all(Array.from({ length: lanes }, () => pull()));
+  return results;
+}
+
 function getVideoDuration(file: File): Promise<number> {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
@@ -119,13 +138,6 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
 
     if (incoming.length === 0) {
       if (mode === "replace") replaceFiles([]);
-      return;
-    }
-
-    const existingCount = mode === "append" ? files.length : 0;
-
-    if (existingCount + incoming.length > maxFilesPerUpload) {
-      setError(`Ju lutemi zgjidhni jo më shumë se ${maxFilesPerUpload} skedarë.`);
       return;
     }
 
@@ -287,7 +299,7 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
     setProgressMap(Object.fromEntries(files.map((f) => [f.id, 0])));
 
     try {
-      const uploaded = await Promise.all(files.map((preview) => uploadOne(preview)));
+      const uploaded = await runWithConcurrency(files, 6, (preview) => uploadOne(preview));
 
       const recordResponse = await fetch("/api/photos/record", {
         method: "POST",
@@ -324,7 +336,7 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
     });
   }
 
-  const canAddMore = files.length < maxFilesPerUpload;
+  const canAddMore = true;
   const submitLabel = files.length > 0 ? `Ngarko ${files.length}` : "Ngarko";
   const totalProgress = files.length
     ? Math.round(files.reduce((sum, f) => sum + (progressMap[f.id] ?? 0), 0) / files.length)
@@ -366,7 +378,7 @@ export function PhotoUploadForm({ maxUploadSizeMb, maxFilesPerUpload }: PhotoUpl
               {files.length > 0 ? (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-cream px-3 py-1 text-xs font-medium text-foreground">
                   <Camera className="h-3 w-3" aria-hidden="true" />
-                  {files.length}/{maxFilesPerUpload}
+                  {files.length} {files.length === 1 ? "skedar" : "skedarë"}
                 </span>
               ) : null}
             </div>
