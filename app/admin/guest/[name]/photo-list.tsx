@@ -5,6 +5,7 @@ import { Download, Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { deletePhotoById } from "@/features/photos/hooks";
 import type { PhotoDto } from "@/features/photos/types";
+import { PhotoLightbox } from "./photo-lightbox";
 
 interface PhotoListProps {
   initialPhotos: PhotoDto[];
@@ -14,6 +15,7 @@ export function PhotoList({ initialPhotos }: PhotoListProps) {
   const [photos, setPhotos] = useState(initialPhotos);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [error, setError] = useState("");
 
   async function handleDelete(id: string): Promise<void> {
@@ -75,7 +77,7 @@ export function PhotoList({ initialPhotos }: PhotoListProps) {
         </p>
       ) : null}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {photos.map((photo) => {
+        {photos.map((photo, idx) => {
           const isDownloading = downloadingId === photo.id;
           const isDeleting = deletingId === photo.id;
 
@@ -84,10 +86,9 @@ export function PhotoList({ initialPhotos }: PhotoListProps) {
               key={photo.id}
               className="group/tile relative aspect-square overflow-hidden rounded-2xl border border-border bg-cream shadow-sm transition-shadow duration-300 hover:shadow-md"
             >
-              <a
-                href={photo.fileUrl}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                onClick={() => setLightboxIndex(idx)}
                 className="block h-full w-full"
                 aria-label={`Hape ${photo.originalName}`}
               >
@@ -97,8 +98,8 @@ export function PhotoList({ initialPhotos }: PhotoListProps) {
                   loading="lazy"
                   className="h-full w-full object-cover transition-transform duration-500 group-hover/tile:scale-105"
                 />
-              </a>
-              <div className="absolute right-2 top-2 flex gap-1.5">
+              </button>
+              <div className="absolute right-2 top-2 z-10 flex gap-1.5">
                 <button
                   type="button"
                   onClick={() => handleDownload(photo)}
@@ -130,6 +131,16 @@ export function PhotoList({ initialPhotos }: PhotoListProps) {
           );
         })}
       </div>
+
+      {lightboxIndex !== null ? (
+        <PhotoLightbox
+          photos={photos}
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onDownload={handleDownload}
+          downloadingId={downloadingId}
+        />
+      ) : null}
     </div>
   );
 }
