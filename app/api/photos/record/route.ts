@@ -1,6 +1,6 @@
 // app/api/photos/record/route.ts
 import { badRequest, success, withErrorHandler } from "@core/api";
-import { createPhotoRecord } from "@/features/photos/service";
+import { createPhotoRecords } from "@/features/photos/service";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -48,18 +48,16 @@ export const POST = withErrorHandler(async (request) => {
 
   const guestName = typeof body.guestName === "string" && body.guestName.trim() ? body.guestName.trim() : undefined;
 
-  const photos = await Promise.all(
-    validPhotos.map((p) =>
-      createPhotoRecord({
-        guestName,
-        fileUrl: p.fileUrl,
-        fileName: p.fileName,
-        originalName: p.originalName,
-        fileSize: p.fileSize,
-        mimeType: p.mimeType,
-      })
-    )
+  const result = await createPhotoRecords(
+    validPhotos.map((p) => ({
+      guestName,
+      fileUrl: p.fileUrl,
+      fileName: p.fileName,
+      originalName: p.originalName,
+      fileSize: p.fileSize,
+      mimeType: p.mimeType,
+    }))
   );
 
-  return success({ photos }, 201);
+  return success({ count: result.count }, 201);
 });

@@ -141,6 +141,39 @@ export async function getPhotos(): Promise<PhotoDto[]> {
   }
 }
 
+export async function createPhotoRecords(inputs: Array<{
+  guestName?: string;
+  fileUrl: string;
+  fileName: string;
+  originalName: string;
+  fileSize: number;
+  mimeType: string;
+}>): Promise<{ count: number }> {
+  try {
+    if (inputs.length === 0) return { count: 0 };
+    const prisma = await getPhotoPrisma();
+    const result = await prisma.photo.createMany({
+      data: inputs.map((input) => ({
+        guestName: input.guestName?.trim() || null,
+        fileUrl: input.fileUrl,
+        fileName: input.fileName,
+        originalName: input.originalName,
+        fileSize: input.fileSize,
+        mimeType: input.mimeType,
+      })),
+    });
+    return { count: result.count };
+  } catch (e) {
+    error("Të dhënat e skedarëve nuk u ruajtën dot. Ju lutemi provoni përsëri më vonë.", {
+      file: "features/photos/service.ts",
+      function: "createPhotoRecords",
+      count: inputs.length,
+      error: formatError(e),
+    });
+    throw new Error("Të dhënat e skedarëve nuk u ruajtën dot. Ju lutemi provoni përsëri më vonë.");
+  }
+}
+
 export async function createPhotoRecord(input: {
   guestName?: string;
   fileUrl: string;
