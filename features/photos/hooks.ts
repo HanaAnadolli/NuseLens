@@ -28,6 +28,16 @@ export async function fetchPhotos(): Promise<PhotoDto[]> {
   }
 }
 
+export async function deletePhotosByGuest(slug: string): Promise<void> {
+  const response = await fetch(`/api/photos/by-guest/${slug}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? "Dosja nuk u fshi dot. Ju lutemi provoni përsëri.");
+  }
+}
+
 export async function deletePhotoById(id: string): Promise<void> {
   try {
     const response = await fetch(`/api/photos/${id}`, {

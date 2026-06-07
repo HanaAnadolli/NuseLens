@@ -8,6 +8,7 @@ import { LogoutButton } from "@/components/logout-button";
 import { getCurrentUser } from "@/features/auth/service";
 import { getPhotosByGuest } from "@/features/photos/service";
 import { ANON_LABEL, decodeGuestSlug } from "../../components/guest-slug";
+import { DeleteFolderButton } from "./delete-folder-button";
 import { PhotoList } from "./photo-list";
 
 export const dynamic = "force-dynamic";
@@ -76,11 +77,14 @@ export default async function GuestPage({ params }: GuestPageProps) {
                 Ngarkimi i fundit: {dateFormatter.format(new Date(latest!.createdAt))}
               </p>
             </div>
-            <div className="flex items-center gap-2 rounded-card border border-border bg-cream px-4 py-3">
-              <ImageIcon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <p className="text-sm font-medium text-foreground">
-                {photos.length} foto
-              </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2 rounded-card border border-border bg-cream px-4 py-3">
+                <ImageIcon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                <p className="text-sm font-medium text-foreground">
+                  {photos.length} skedarë
+                </p>
+              </div>
+              <DeleteFolderButton slug={name} guestName={displayName} />
             </div>
           </div>
         </div>

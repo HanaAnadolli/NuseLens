@@ -206,6 +206,42 @@ export async function createPhotoRecord(input: {
   }
 }
 
+export async function deletePhotosByGuest(guestName: string | null): Promise<{ count: number }> {
+  try {
+    const prisma = await getPhotoPrisma();
+    const where = guestName === null ? { guestName: null } : { guestName };
+
+    const photos = await prisma.photo.findMany({ where });
+    if (photos.length === 0) {
+      return { count: 0 };
+    }
+
+    await Promise.all(
+      photos.map((photo) =>
+        deleteUploadedFile(photo.fileUrl, photo.fileName).catch((e) => {
+          error("Couldn't delete uploaded file during bulk guest delete", {
+            file: "features/photos/service.ts",
+            function: "deletePhotosByGuest",
+            id: photo.id,
+            error: formatError(e),
+          });
+        })
+      )
+    );
+
+    const result = await prisma.photo.deleteMany({ where });
+    return { count: result.count };
+  } catch (e) {
+    error("Skedarët e mysafirit nuk u fshinë dot.", {
+      file: "features/photos/service.ts",
+      function: "deletePhotosByGuest",
+      guestName: guestName ?? "(anonymous)",
+      error: formatError(e),
+    });
+    throw new Error("Skedarët e mysafirit nuk u fshinë dot. Ju lutemi provoni përsëri.");
+  }
+}
+
 export async function deletePhoto(id: string): Promise<boolean> {
   try {
     const prisma = await getPhotoPrisma();
