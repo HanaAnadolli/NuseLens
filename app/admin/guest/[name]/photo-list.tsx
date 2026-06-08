@@ -1,6 +1,7 @@
 // app/admin/guest/[name]/photo-list.tsx
 "use client";
 
+import Image from "next/image";
 import { Download, Loader2, Play, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { deletePhotoById } from "@/features/photos/hooks";
@@ -133,11 +134,12 @@ export function PhotoList({ initialPhotos }: PhotoListProps) {
                     </div>
                   </>
                 ) : (
-                  <img
+                  <Image
                     src={photo.fileUrl}
                     alt={photo.originalName}
-                    loading="lazy"
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover/tile:scale-105"
+                    fill
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                    className="object-cover transition-transform duration-500 group-hover/tile:scale-105"
                   />
                 )}
               </button>

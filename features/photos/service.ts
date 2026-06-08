@@ -4,8 +4,16 @@ import { mkdir, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { Buffer } from "buffer";
 import type { Photo } from "@prisma/client";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { error, formatError } from "@core/logger";
 import type { PhotoDto, PhotoValidationResult, SavedUpload } from "@/features/photos/types";
+
+const PHOTOS_CACHE_TAG = "photos";
+const PHOTOS_CACHE_TTL_SECONDS = 60;
+
+export function revalidatePhotosCache(): void {
+  revalidateTag(PHOTOS_CACHE_TAG);
+}
 
 const ALLOWED_IMAGE_TYPES = new Map<string, string>([
   ["image/jpeg", "jpg"],
@@ -103,7 +111,7 @@ export function photoToDto(photo: Photo): PhotoDto {
   }
 }
 
-export async function getPhotosByGuest(guestName: string | null): Promise<PhotoDto[]> {
+async function fetchPhotosByGuest(guestName: string | null): Promise<PhotoDto[]> {
   try {
     const prisma = await getPhotoPrisma();
     const photos = await prisma.photo.findMany({
@@ -123,7 +131,13 @@ export async function getPhotosByGuest(guestName: string | null): Promise<PhotoD
   }
 }
 
-export async function getPhotos(): Promise<PhotoDto[]> {
+export const getPhotosByGuest = unstable_cache(
+  fetchPhotosByGuest,
+  ["photos:by-guest"],
+  { revalidate: PHOTOS_CACHE_TTL_SECONDS, tags: [PHOTOS_CACHE_TAG] }
+);
+
+async function fetchPhotos(): Promise<PhotoDto[]> {
   try {
     const prisma = await getPhotoPrisma();
     const photos = await prisma.photo.findMany({
@@ -140,6 +154,11 @@ export async function getPhotos(): Promise<PhotoDto[]> {
     throw new Error("Fotot nuk u ngarkuan dot. Ju lutemi provoni përsëri më vonë.");
   }
 }
+
+export const getPhotos = unstable_cache(fetchPhotos, ["photos:all"], {
+  revalidate: PHOTOS_CACHE_TTL_SECONDS,
+  tags: [PHOTOS_CACHE_TAG],
+});
 
 export async function createPhotoRecords(inputs: Array<{
   guestName?: string;

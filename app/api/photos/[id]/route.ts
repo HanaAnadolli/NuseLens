@@ -2,7 +2,7 @@
 import type { NextRequest } from "next/server";
 import { notFound, success, unauthorized, withErrorHandler } from "@core/api";
 import { requireAdminFromRequest } from "@/features/auth/service";
-import { deletePhoto } from "@/features/photos/service";
+import { deletePhoto, revalidatePhotosCache } from "@/features/photos/service";
 
 export const runtime = "nodejs";
 
@@ -30,5 +30,6 @@ export const DELETE = withErrorHandler(async (request: NextRequest, context: Pho
     return notFound("Fotoja nuk u gjet.");
   }
 
+  revalidatePhotosCache();
   return success({ ok: true });
 });

@@ -1,6 +1,6 @@
 // app/api/photos/record/route.ts
 import { badRequest, success, withErrorHandler } from "@core/api";
-import { createPhotoRecords } from "@/features/photos/service";
+import { createPhotoRecords, revalidatePhotosCache } from "@/features/photos/service";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -59,5 +59,6 @@ export const POST = withErrorHandler(async (request) => {
     }))
   );
 
+  revalidatePhotosCache();
   return success({ count: result.count }, 201);
 });

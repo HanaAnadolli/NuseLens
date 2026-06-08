@@ -1,4 +1,5 @@
 // app/admin/components/guest-folder.tsx
+import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight, Play } from "lucide-react";
 import type { PhotoDto } from "@/features/photos/types";
@@ -58,13 +59,15 @@ export function GuestFolder({ guestName, isAnonymous, photos }: GuestFolderProps
             );
           }
           return (
-            <img
-              key={photo.id}
-              src={photo.fileUrl}
-              alt=""
-              loading="lazy"
-              className={layout}
-            />
+            <div key={photo.id} className={cn(layout, "overflow-hidden p-0")}>
+              <Image
+                src={photo.fileUrl}
+                alt=""
+                fill
+                sizes="200px"
+                className="object-cover"
+              />
+            </div>
           );
         })}
       </div>
